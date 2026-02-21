@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contrast Checker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+  header { background: #1a1a2e; color: white; padding: 20px 24px; }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header p { font-size: 0.85rem; opacity: 0.7; margin-top: 4px; }
+  .container { max-width: 760px; margin: 32px auto; padding: 0 16px; }
+
+  .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+
+  .color-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .color-group label { display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #555; margin-bottom: 8px; }
+  .color-row { display: flex; align-items: center; gap: 10px; }
+  .color-swatch { width: 44px; height: 44px; border-radius: 8px; border: 2px solid #ddd; cursor: pointer; flex-shrink: 0; padding: 0; background: none; overflow: hidden; }
+  .color-swatch input[type=color] { width: 60px; height: 60px; border: none; cursor: pointer; margin: -8px; }
+  .hex-input { flex: 1; font-size: 1rem; font-family: monospace; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; width: 100%; transition: border-color .2s; }
+  .hex-input:focus { outline: none; border-color: #4f6ef7; }
+
+  /* Preview */
+  .preview-box { border-radius: 10px; padding: 28px 24px; margin-top: 4px; transition: background .2s, color .2s; }
+  .preview-box .preview-normal { font-size: 1rem; margin-bottom: 12px; }
+  .preview-box .preview-large { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; }
+  .preview-box .preview-ui { display: inline-block; padding: 8px 18px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; border: 2px solid; cursor: default; }
+
+  /* Ratio */
+  .ratio-display { text-align: center; padding: 18px 0 8px; }
+  .ratio-number { font-size: 3rem; font-weight: 800; line-height: 1; color: #1a1a2e; }
+  .ratio-label { font-size: 0.8rem; color: #777; margin-top: 4px; }
+
+  /* Results */
+  .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .result-item { border-radius: 10px; padding: 14px 12px; text-align: center; border: 1.5px solid transparent; }
+  .result-item .level { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; opacity: 0.65; }
+  .result-item .type { font-size: 0.82rem; font-weight: 600; margin-bottom: 8px; }
+  .result-item .badge { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  .pass { background: #f0fdf4; border-color: #86efac; }
+  .pass .badge { background: #16a34a; color: white; }
+  .fail { background: #fef2f2; border-color: #fca5a5; }
+  .fail .badge { background: #dc2626; color: white; }
+
+  /* Hint */
+  .hint { font-size: 0.78rem; color: #888; margin-top: 14px; line-height: 1.5; }
+  .hint a { color: #4f6ef7; text-decoration: none; }
+
+  @media (max-width: 500px) {
+    .color-inputs { grid-template-columns: 1fr; }
+    .results-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Contrast Checker</h1>
+  <p>WCAG 2.1 Accessibility Contrast Analyzer</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="color-inputs">
+      <div class="color-group">
+        <label>Foreground Color</label>
+        <div class="color-row">
+          <button class="color-swatch" id="fgSwatch" title="Pick foreground color">
+            <input type="color" id="fgPicker" value="#000000">
+          </button>
+          <input type="text" class="hex-input" id="fgHex" value="#000000" maxlength="9" spellcheck="false">
+        </div>
+      </div>
+      <div class="color-group">
+        <label>Background Color</label>
+        <div class="color-row">
+          <button class="color-swatch" id="bgSwatch" title="Pick background color">
+            <input type="color" id="bgPicker" value="#ffffff">
+          </button>
+          <input type="text" class="hex-input" id="bgHex" value="#ffffff" maxlength="9" spellcheck="false">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="preview-box" id="previewBox">
+      <div class="preview-normal">Normal text — The quick brown fox jumps over the lazy dog.</div>
+      <div class="preview-large">Large Text (18pt / 14pt Bold)</div>
+      <span class="preview-ui" id="previewBtn">UI Component</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ratio-display">
+      <div class="ratio-number" id="ratioNum">21:1</div>
+      <div class="ratio-label">Contrast Ratio</div>
+    </div>
+    <div class="results-grid" id="resultsGrid"></div>
+    <p class="hint">
+      WCAG 2.1 requires a contrast ratio of at least <strong>4.5:1</strong> for normal text (AA),
+      <strong>3:1</strong> for large text (AA) and UI components, and <strong>7:1</strong> / <strong>4.5:1</strong> for AAA.
+    </p>
+  </div>
+</div>
+
+<script>
+const fgHexEl = document.getElementById('fgHex');
+const bgHexEl = document.getElementById('bgHex');
+const fgPicker = document.getElementById('fgPicker');
+const bgPicker = document.getElementById('bgPicker');
+const fgSwatch = document.getElementById('fgSwatch');
+const bgSwatch = document.getElementById('bgSwatch');
+const previewBox = document.getElementById('previewBox');
+const previewBtn = document.getElementById('previewBtn');
+const ratioNum = document.getElementById('ratioNum');
+const resultsGrid = document.getElementById('resultsGrid');
+
+function hexToRgb(hex) {
+  hex = hex.replace('#','');
+  if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+  if (hex.length !== 6) return null;
+  const n = parseInt(hex, 16);
+  return isNaN(n) ? null : { r: (n>>16)&255, g: (n>>8)&255, b: n&255 };
+}
+
+function linearize(c) {
+  c /= 255;
+  return c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+}
+
+function luminance({r,g,b}) {
+  return 0.2126*linearize(r) + 0.7152*linearize(g) + 0.0722*linearize(b);
+}
+
+function contrastRatio(l1, l2) {
+  const [hi, lo] = l1 > l2 ? [l1,l2] : [l2,l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function update() {
+  const fg = hexToRgb(fgHexEl.value);
+  const bg = hexToRgb(bgHexEl.value);
+  if (!fg || !bg) return;
+
+  // Sync pickers & swatches
+  const fgHex6 = '#' + [fg.r,fg.g,fg.b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const bgHex6 = '#' + [bg.r,bg.g,bg.b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  fgPicker.value = fgHex6;
+  bgPicker.value = bgHex6;
+  fgSwatch.style.background = fgHex6;
+  bgSwatch.style.background = bgHex6;
+
+  const ratio = contrastRatio(luminance(fg), luminance(bg));
+  ratioNum.textContent = ratio.toFixed(2) + ':1';
+
+  // Preview
+  previewBox.style.background = bgHex6;
+  previewBox.style.color = fgHex6;
+  previewBtn.style.borderColor = fgHex6;
+
+  // WCAG results
+  const checks = [
+    { level:'AA',  type:'Normal Text',  req:4.5 },
+    { level:'AA',  type:'Large Text',   req:3.0 },
+    { level:'AA',  type:'UI Components',req:3.0 },
+    { level:'AAA', type:'Normal Text',  req:7.0 },
+    { level:'AAA', type:'Large Text',   req:4.5 },
+    { level:'AAA', type:'UI Components',req:4.5 },
+  ];
+  resultsGrid.innerHTML = checks.map(c => {
+    const pass = ratio >= c.req;
+    return `<div class="result-item ${pass?'pass':'fail'}">
+      <div class="level">${c.level}</div>
+      <div class="type">${c.type}</div>
+      <div class="badge">${pass ? '✓ Pass' : '✗ Fail'}</div>
+    </div>`;
+  }).join('');
+}
+
+// Hex inputs
+[fgHexEl, bgHexEl].forEach(el => el.addEventListener('input', update));
+
+// Color pickers
+fgPicker.addEventListener('input', e => { fgHexEl.value = e.target.value; update(); });
+bgPicker.addEventListener('input', e => { bgHexEl.value = e.target.value; update(); });
+
+// Initial
+update();
+</script>
+</body>
+</html>
